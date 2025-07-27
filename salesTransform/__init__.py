@@ -6,17 +6,25 @@ import azure.functions as func
 def main(inputBlob: func.InputStream, outputBlob: func.Out[func.InputStream]):
     logging.info(f"Processing blob: {inputBlob.name}, Size: {inputBlob.length} bytes")
 
-    # Read CSV from blob
-    csv_data = inputBlob.read().decode('utf-8')
-    df = pd.read_csv(StringIO(csv_data))
+    try:
+        # Read CSV from blob
+        csv_data = inputBlob.read().decode('utf-8')
+        df = pd.read_csv(StringIO(csv_data))
 
-    # Sample transformation: filter & calculate profit
-    df = df[df['TotalRevenue'] > 0]
-    df['Profit'] = df['TotalRevenue'] - (df['OrderQuantity'] * df['UnitPrice'])
+        # Validate expected columns
+        required_columns = {'TotalRevenue', 'OrderQuantity', 'UnitPrice'}
+        if not required_columns.issubset(df.columns):
+            raise ValueError(f"Missing required columns. Found: {df.columns.tolist()}")
 
-    # Output transformed CSV
-    output_csv = df.to_csv(index=False)
-    outputBlob.set(output_csv.encode('utf-8'))
+        # Apply transformation
+        df = df[df['TotalRevenue'] > 0]
+        df['Profit'] = df['TotalRevenue'] - (df['OrderQuantity'] * df['UnitPrice'])
 
-    logging.info("Transformation completed and blob written to processed-sales/")
+        # Output CSV
+        output_csv = df.to_csv(index=False)
+        outputBlob.set(output_csv.encode('utf-8'))
 
+        logging.info("✅ Blob transformed and written to processed folder.")
+
+    except Exception as e:
+        logging.error(f"❌ Error processing blob: {e}")
