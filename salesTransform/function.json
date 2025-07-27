@@ -1,1 +1,19 @@
-
+{
+  "scriptFile": "__init__.py",
+  "bindings": [
+    {
+      "name": "inputBlob",
+      "type": "blobTrigger",
+      "direction": "in",
+      "path": "raw-sales/{name}",
+      "connection": "AzureWebJobsStorage"
+    },
+    {
+      "name": "outputBlob",
+      "type": "blob",
+      "direction": "out",
+      "path": "processed-sales/{name}",
+      "connection": "AzureWebJobsStorage"
+    }
+  ]
+}
