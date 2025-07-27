@@ -5,14 +5,14 @@
       "name": "inputBlob",
       "type": "blobTrigger",
       "direction": "in",
-      "path": "raw-sales/{name}",
+      "path": "salescontainer/raw/2025/07/27/{name}",
       "connection": "AzureWebJobsStorage"
     },
     {
       "name": "outputBlob",
       "type": "blob",
       "direction": "out",
-      "path": "processed-sales/{name}",
+      "path": "salescontainer/processed/2025/07/27/{name}",
       "connection": "AzureWebJobsStorage"
     }
   ]
