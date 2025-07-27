@@ -4,14 +4,14 @@
       "name": "inputBlob",
       "type": "blobTrigger",
       "direction": "in",
-      "path": "salescontainer/raw/{yyyy}/{MM}/{dd}/{name}",
+      "path": "salescontainer/raw/{year}/{month}/{day}/{name}",
       "connection": "AzureWebJobsStorage"
     },
     {
       "name": "outputBlob",
       "type": "blob",
       "direction": "out",
-      "path": "salescontainer/processed/{yyyy}/{MM}/{dd}/{name}",
+      "path": "salescontainer/processed/{year}/{month}/{day}/{name}",
       "connection": "AzureWebJobsStorage"
     }
   ]
