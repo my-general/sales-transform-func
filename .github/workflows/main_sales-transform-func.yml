@@ -32,50 +32,41 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      # --- CRITICAL CHANGE START ---
-      # Create and activate virtual environment in a specific directory
-      # Install dependencies into this local venv's site-packages directory
-      # This is where pandas will be installed locally by GitHub Actions
       - name: Install dependencies locally into a .python_packages folder
         run: |
-          # Create a directory for Python packages directly in the project root
           mkdir -p .python_packages/lib/python${{ env.PYTHON_VERSION }}/site-packages
           # Install dependencies into this specific target directory
           pip install --target=".python_packages/lib/python${{ env.PYTHON_VERSION }}/site-packages" -r requirements.txt
-          # Verify pandas is installed (optional, but good for debugging)
-          python -c "import pandas; print(f'Pandas version: {pandas.__version__}')"
           # Ensure azure-functions is also there if your code relies on it explicitly being in site-packages
           pip install --target=".python_packages/lib/python${{ env.PYTHON_VERSION }}/site-packages" azure-functions
-      # --- CRITICAL CHANGE END ---
+          # --- REMOVED THE FOLLOWING LINES THAT CAUSED BUILD FAILURE ---
+          # python -c "import pandas; print(f'Pandas version: {pandas.__version__}')"
+          # -------------------------------------------------------------
 
       - name: Zip artifact for deployment
-        # Now, zip the *entire* project, INCLUDING the newly created .python_packages folder.
-        # We explicitly exclude .git and .github as they are not needed for the runtime.
         run: zip -r release.zip . -x ".git/*" ".github/*"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: python-app
-          path: release.zip # Upload the created zip file
+          path: release.zip
 
   deploy:
     runs-on: ubuntu-latest
-    needs: build # This job depends on the 'build' job completing successfully
+    needs: build
     permissions:
-      id-token: write # Required for Azure login with OIDC
-      contents: read # Required to download artifacts
+      id-token: write
+      contents: read
 
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: python-app # Name of the artifact to download
-          path: ${{ github.workspace }} # Download to the root of the workspace
+          name: python-app
+          path: ${{ github.workspace }}
 
       - name: Unzip artifact
-        # Unzip the artifact. The zip contains the root of your function app.
-        # Unzip into a temporary directory so the Azure Functions action can pick it up.
         run: unzip ${{ github.workspace }}/release.zip -d ${{ github.workspace }}/output_package
 
       - name: Azure Login
@@ -91,9 +82,5 @@ jobs:
         with:
           app-name: 'sales-transform-func'
           slot-name: 'Production'
-          # CRITICAL CHANGE: Set `enable-oryx-build` to false.
-          # We are now packaging dependencies ourselves, so Oryx should NOT rebuild.
-          enable-oryx-build: false # <--- THIS IS NOW FALSE
-          # Point the package to the unzipped directory containing your function app's root files,
-          # which now includes the .python_packages folder with installed dependencies.
+          enable-oryx-build: false
           package: ${{ github.workspace }}/output_package
