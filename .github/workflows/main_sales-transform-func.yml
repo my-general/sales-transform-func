@@ -39,9 +39,11 @@ jobs:
           pip install --target=".python_packages/lib/python${{ env.PYTHON_VERSION }}/site-packages" -r requirements.txt
           # Ensure azure-functions is also there if your code relies on it explicitly being in site-packages
           pip install --target=".python_packages/lib/python${{ env.PYTHON_VERSION }}/site-packages" azure-functions
-          # --- REMOVED THE FOLLOWING LINES THAT CAUSED BUILD FAILURE ---
-          # python -c "import pandas; print(f'Pandas version: {pandas.__version__}')"
-          # -------------------------------------------------------------
+
+          # --- ADD THIS NEW LINE ---
+          echo "Listing contents of .python_packages for verification:"
+          ls -R .python_packages
+          # ------------------------
 
       - name: Zip artifact for deployment
         run: zip -r release.zip . -x ".git/*" ".github/*"
