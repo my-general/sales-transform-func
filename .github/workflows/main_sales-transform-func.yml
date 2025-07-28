@@ -11,9 +11,11 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'  # path to your Azure Function App project root
-  PYTHON_VERSION: '3.10'               # supported: 3.6 to 3.11
-  AZURE_WEB_JOBS_STORAGE: ${{ secrets.AZURE_WEB_JOBS_STORAGE }}
+  # Path to your Azure Function App project root.
+  # This should be the directory containing host.json and your function folders.
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
+  PYTHON_VERSION: '3.10' # supported: 3.6 to 3.11
+  AZURE_WEB_JOBS_STORAGE: ${{ secrets.AZURE_WEB_JOBS_STORAGE }} # This secret should contain your Storage Account connection string
 
 jobs:
   build:
@@ -30,6 +32,10 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      # These steps (venv creation and pip install) are for local CI checks (linting, testing)
+      # They are NOT strictly necessary for deployment if `enable_oryx_build: true` is used,
+      # as Oryx will handle dependency installation on Azure.
+      # However, keeping them is good practice for ensuring your code runs in a build environment.
       - name: Create and activate virtual environment
         run: |
           python -m venv venv
@@ -38,31 +44,40 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # Zip the entire project, but exclude the virtual environment as it will be large
+      # Oryx build will install dependencies on Azure.
+      # The `package` parameter in `Azure/functions-action` expects the path to the root
+      # of your function app, which contains `host.json` and your function folders.
       - name: Zip artifact for deployment
-        run: zip release.zip ./* -r -x "venv/*" ".git/*" ".github/*"
+        # Ensure that `requirements.txt` is included in this zip
+        # The `package: .` or `package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}`
+        # will assume the root of the extracted zip is the function app root.
+        run: |
+          zip -r release.zip . -x "venv/*" ".git/*" ".github/*" ".*"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: python-app
-          path: |
-            release.zip
+          path: release.zip # Upload the created zip file
 
   deploy:
     runs-on: ubuntu-latest
-    needs: build
+    needs: build # This job depends on the 'build' job completing successfully
     permissions:
-      id-token: write
-      contents: read
+      id-token: write # Required for Azure login with OIDC
+      contents: read # Required to download artifacts
 
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: python-app
+          name: python-app # Name of the artifact to download
+          path: ${{ github.workspace }} # Download to the root of the workspace
 
       - name: Unzip artifact
-        run: unzip release.zip
+        # Unzip the artifact. The zip contains the root of your function app.
+        run: unzip ${{ github.workspace }}/release.zip -d ${{ github.workspace }}/output_package
 
       - name: Azure Login
         uses: azure/login@v2
@@ -77,4 +92,8 @@ jobs:
         with:
           app-name: 'sales-transform-func'
           slot-name: 'Production'
-          package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+          # CRITICAL CHANGE: Set `enable_oryx_build` to true.
+          # This tells Azure to read your requirements.txt and install dependencies on the server.
+          enable_oryx_build: true
+          # Point the package to the unzipped directory containing your function app's root files.
+          package: ${{ github.workspace }}/output_package
