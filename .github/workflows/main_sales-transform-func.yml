@@ -94,6 +94,6 @@ jobs:
           slot-name: 'Production'
           # CRITICAL CHANGE: Set `enable_oryx_build` to true.
           # This tells Azure to read your requirements.txt and install dependencies on the server.
-          enable_oryx_build: true
+          enable-oryx-build: true
           # Point the package to the unzipped directory containing your function app's root files.
           package: ${{ github.workspace }}/output_package
