@@ -32,28 +32,26 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      # These steps (venv creation and pip install) are for local CI checks (linting, testing)
-      # They are NOT strictly necessary for deployment if `enable_oryx_build: true` is used,
-      # as Oryx will handle dependency installation on Azure.
-      # However, keeping them is good practice for ensuring your code runs in a build environment.
-      - name: Create and activate virtual environment
+      # --- CRITICAL CHANGE START ---
+      # Create and activate virtual environment in a specific directory
+      # Install dependencies into this local venv's site-packages directory
+      # This is where pandas will be installed locally by GitHub Actions
+      - name: Install dependencies locally into a .python_packages folder
         run: |
-          python -m venv venv
-          source venv/bin/activate
+          # Create a directory for Python packages directly in the project root
+          mkdir -p .python_packages/lib/python${{ env.PYTHON_VERSION }}/site-packages
+          # Install dependencies into this specific target directory
+          pip install --target=".python_packages/lib/python${{ env.PYTHON_VERSION }}/site-packages" -r requirements.txt
+          # Verify pandas is installed (optional, but good for debugging)
+          python -c "import pandas; print(f'Pandas version: {pandas.__version__}')"
+          # Ensure azure-functions is also there if your code relies on it explicitly being in site-packages
+          pip install --target=".python_packages/lib/python${{ env.PYTHON_VERSION }}/site-packages" azure-functions
+      # --- CRITICAL CHANGE END ---
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      # Zip the entire project, but exclude the virtual environment as it will be large
-      # Oryx build will install dependencies on Azure.
-      # The `package` parameter in `Azure/functions-action` expects the path to the root
-      # of your function app, which contains `host.json` and your function folders.
       - name: Zip artifact for deployment
-        # Ensure that `requirements.txt` is included in this zip
-        # The `package: .` or `package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}`
-        # will assume the root of the extracted zip is the function app root.
-        run: |
-          zip -r release.zip . -x "venv/*" ".git/*" ".github/*" ".*"
+        # Now, zip the *entire* project, INCLUDING the newly created .python_packages folder.
+        # We explicitly exclude .git and .github as they are not needed for the runtime.
+        run: zip -r release.zip . -x ".git/*" ".github/*"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -77,6 +75,7 @@ jobs:
 
       - name: Unzip artifact
         # Unzip the artifact. The zip contains the root of your function app.
+        # Unzip into a temporary directory so the Azure Functions action can pick it up.
         run: unzip ${{ github.workspace }}/release.zip -d ${{ github.workspace }}/output_package
 
       - name: Azure Login
@@ -92,8 +91,9 @@ jobs:
         with:
           app-name: 'sales-transform-func'
           slot-name: 'Production'
-          # CRITICAL CHANGE: Set `enable_oryx_build` to true.
-          # This tells Azure to read your requirements.txt and install dependencies on the server.
-          enable-oryx-build: true
-          # Point the package to the unzipped directory containing your function app's root files.
+          # CRITICAL CHANGE: Set `enable-oryx-build` to false.
+          # We are now packaging dependencies ourselves, so Oryx should NOT rebuild.
+          enable-oryx-build: false # <--- THIS IS NOW FALSE
+          # Point the package to the unzipped directory containing your function app's root files,
+          # which now includes the .python_packages folder with installed dependencies.
           package: ${{ github.workspace }}/output_package
