@@ -3,6 +3,29 @@
   "extensionBundle": {
     "id": "Microsoft.Azure.Functions.ExtensionBundle",
     "version": "[4.*, 5.0.0)"
+  },
+  "logging": {
+    "logLevel": {
+      "default": "Information",
+      "Host.Triggers.Blob": "Information",
+      "Function.salesTransform": "Debug"
+    },
+    "applicationInsights": {
+      "samplingSettings": {
+        "isEnabled": true,
+        "maxTelemetryItemsToExposePerSecond": 5
+      }
+    }
+  },
+  "extensions": {
+    "queues": {
+      "maxPollingInterval": "00:00:02",
+      "visibilityTimeout" : "00:00:30",
+      "maxDequeueCount": 5 // This determines how many times a message will be retried on failure
+    },
+    "blobs": {
+      "maxDegreeOfParallelism": 1,
+      "maxBlobPollingInterval": "00:00:10"
+    }
   }
 }
-
